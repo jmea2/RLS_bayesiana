@@ -1,0 +1,142 @@
+---
+title: "Regresion Lineal Bayesiana"
+output: html_notebook
+---
+```{r}
+# instalacion de librerias
+install.packages("datarium")
+library(tidyverse)
+install.packages("rstanarm")
+install.packages("explore")
+install.packages("bayesplot")
+install.packages("bayestestR")
+
+# activacion de librerias
+library(datarium)
+library(rstanarm)
+library(skimr)
+library(explore)
+library(bayesplot)
+library(bayestestR)
+library(car)
+```
+
+Se carga los datos que trae el paquete datarium, y examinemos que variables:
+
+```{r}
+data("marketing")
+str(marketing)
+```
+
+exploremos un poco los datos:
+```{r}
+skimr::skim(marketing)
+explore(marketing)
+```
+
+Examinemos la correlación:
+
+```{r}
+cor(marketing)
+```
+
+examinemos la significancia de los coeficientes:
+
+```{r}
+cor.test(marketing$sales, marketing$youtube)
+```
+
+identifiquemos el modelo a estimar:
+
+$$ Sales = \beta_0+\beta_1\times youtube + \beta_2\times facebook + \beta_3\times newspaper$$
+
+ajustemos el modelo lineal por maxima verosimilitud:
+
+```{r}
+model.clasico <- lm(sales~youtube+facebook+newspaper, data = marketing)
+summary(model.clasico)
+```
+Tasa de precision:
+```{r}
+2.023/mean(marketing$sales)*100
+```
+
+Podriamos ajustar un segundo modelo reducido en variables? y de ser asi, lo podriamos comparar ?
+
+```{r}
+modelo.red <- lm()
+AIC(model.clasico, modelo.red)
+```
+
+podriamos predecir algunos valores con base al modelo ajustado:
+
+```{r}
+predict(model.clasico, newdata = data.frame(youtube = c(100), facebook = c(0), newspaper = c(0)))
+```
+
+
+Modelo Lineal bayesiano
+
+```{r}
+model.bayes <- stan_glm(formula = sales~youtube+facebook+newspaper,
+         family = gaussian(),
+         data = marketing,
+         prior = normal(),
+         seed = 111,
+         algorithm = "sampling")
+```
+
+resumen del modelo:
+```{r}
+model.bayes$coefficients
+```
+```{r}
+hdi(model.bayes)
+```
+
+```{r}
+mcmc_dens(model.bayes, 
+          pars = c("youtube","facebook","newspaper"))
+```
+Vamos a suponer que en estudios similares la informacion sobre impactos sobre las ventas cuando se invierte en publicidad por:
+youtube  promedio de 60 mil dolares con un desviación de mas o menos 2 mil dolares
+facebook promedio de 250 mil dolares con un desvio de 10 mil dolares
+periodico no hya incrementos importantes con un desvio de 1000 dolares
+
+ajustamos nuestro modelo bayesiano con esa infomacion previa sobre el comportamiento de las inversiones en publicidad
+```{r}
+model.bayes.mod <- stan_glm(formula = sales~youtube+facebook+newspaper,
+         family = gaussian(),
+         data = marketing,
+         prior = normal(location = c(0.06, 0.25, 0) , scale = c(0.002,0.01,0.001)),
+         seed = 111,
+         algorithm = "sampling")
+```
+
+resumen del modelo:
+```{r}
+model.bayes.mod$coefficients
+```
+
+estiamciones de credibilidad al 95%
+```{r}
+hdi(model.bayes.mod)
+```
+
+```{r}
+mcmc_dens(model.bayes.mod, 
+          pars = c("youtube","facebook","newspaper"))
+```
+error del modelo 
+```{r}
+sigma(model.clasico)
+```
+
+```{r}
+sigma(model.bayes)
+```
+
+```{r}
+sigma(model.bayes.mod)
+```
+
